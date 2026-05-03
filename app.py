@@ -7,8 +7,8 @@ from utils import extract_text_from_pdf, chunk_text
 
 # Load API key
 load_dotenv()
-api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
-client = Groq(api_key=api_key)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 st.set_page_config(page_title="Text Summarizer", layout="wide")
 
 st.title("📄 AI Text & PDF Summarizer")
