@@ -1,35 +1,72 @@
 import streamlit as st
 from groq import Groq
-import os
 from dotenv import load_dotenv
-import pdfplumber
+import os
 
+from utils import extract_text_from_pdf, chunk_text
+
+# Load API key
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-st.title("📄 AI Text Summarizer")
+st.set_page_config(page_title="Text Summarizer", layout="wide")
 
-option = st.radio("Choose Input Type", ["Text", "PDF"])
+st.title("📄 AI Text & PDF Summarizer")
+
+# ---------------- INPUT ----------------
+option = st.radio("Choose Input Type", ["Text", "PDF Upload"])
 
 text = ""
 
 if option == "Text":
-    text = st.text_area("Enter text")
+    text = st.text_area("Paste your text here", height=300)
 
-else:
+elif option == "PDF Upload":
     file = st.file_uploader("Upload PDF", type=["pdf"])
     if file:
-        with pdfplumber.open(file) as pdf:
-            text = "".join(page.extract_text() or "" for page in pdf.pages)
+        text = extract_text_from_pdf(file)
+        st.success("PDF loaded successfully!")
 
+# ---------------- SETTINGS ----------------
 length = st.selectbox("Summary Length", ["Short", "Medium", "Detailed"])
+bullet = st.checkbox("Bullet Point Summary")
 
-if st.button("Summarize"):
-    prompt = f"Summarize this in {length} format:\n\n{text}"
+# ---------------- SUMMARIZATION ----------------
+def summarize(text, length, bullet):
+    chunks = chunk_text(text)
 
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": prompt}]
-    )
+    summaries = []
 
-    st.write(response.choices[0].message.content)
+    for chunk in chunks:
+        prompt = f"""
+        Summarize the following text in {length.lower()} form.
+        {"Give bullet points." if bullet else "Give paragraph format."}
+
+        Text:
+        {chunk}
+        """
+
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "You are a helpful summarization assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400
+        )
+
+        summaries.append(response.choices[0].message.content)
+
+    return "\n\n".join(summaries)
+
+
+# ---------------- BUTTON ----------------
+if st.button("✨ Generate Summary"):
+    if text.strip() == "":
+        st.warning("Please enter or upload text first.")
+    else:
+        with st.spinner("Summarizing..."):
+            result = summarize(text, length, bullet)
+
+        st.subheader("📝 Summary")
+        st.write(result)
